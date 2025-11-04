@@ -1,0 +1,16 @@
+Checking submission: A Accepted 60
+Problem match: 0, Status match: 0
+Checking submission: A Accepted 60
+Problem match: 0, Status match: 0
+Parsed query: team=Team_A, problem=PROBLEM=A, status=STATUS=Accepted
+Checking submission: A Accepted 60
+Problem match: 0, Status match: 0
+Parsed query: team=Team_A, problem=PROBLEM=ALL, status=STATUS=ALL
+Checking submission: A Accepted 60
+Problem match: 0, Status match: 0
+Parsed query: team=Team_A, problem=A, status=Accepted
+Checking submission: A Accepted 60
+Problem match: 1, Status match: 1
+Parsed query: team=Team_A, problem=ALL, status=ALL
+Checking submission: A Accepted 60
+Problem match: 1, Status match: 1
