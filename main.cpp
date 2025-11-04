@@ -88,9 +88,10 @@ private:
     int problem_count;
     vector<string> problem_names;
     vector<Submission> all_submissions;
+    bool first_flush_done;
 
 public:
-    ICPCManager() : competition_started(false), frozen(false), duration_time(0), problem_count(0) {}
+    ICPCManager() : competition_started(false), frozen(false), duration_time(0), problem_count(0), first_flush_done(false) {}
 
     void add_team(const string& team_name) {
         if (competition_started) {
@@ -146,6 +147,7 @@ public:
 
         cout << "[Info]Flush scoreboard." << endl;
         print_scoreboard(ranked_teams);
+        first_flush_done = true;
     }
 
     void freeze_scoreboard() {
@@ -170,6 +172,7 @@ public:
 
         cout << "[Info]Scroll scoreboard." << endl;
 
+        // First, flush the scoreboard (this is done automatically by the sort)
         vector<Team*> before_teams = team_ptrs;
         sort(before_teams.begin(), before_teams.end(), [this](Team* a, Team* b) {
             return compare_teams(a, b);
@@ -177,26 +180,67 @@ public:
 
         print_scoreboard(before_teams);
 
+        // Process scroll operations until no frozen problems remain
+        bool has_frozen_problems = true;
+        while (has_frozen_problems) {
+            has_frozen_problems = false;
+
+            // Find the lowest-ranked team with frozen problems
+            Team* lowest_frozen_team = nullptr;
+            string lowest_frozen_problem;
+            int lowest_rank = -1;
+
+            for (int i = before_teams.size() - 1; i >= 0; i--) {
+                Team* team = before_teams[i];
+
+                // Find the smallest-numbered frozen problem for this team
+                for (const auto& problem_name : problem_names) {
+                    const auto& problem = team->problems[problem_name];
+                    // A problem is frozen if it has frozen_submissions > 0 (regardless of whether it's now solved)
+                    if (problem.frozen_submissions > 0) {
+                        if (lowest_rank == -1 || i > lowest_rank) {
+                            lowest_rank = i;
+                            lowest_frozen_team = team;
+                            lowest_frozen_problem = problem_name;
+                            has_frozen_problems = true;
+                        }
+                        break; // Take the first (smallest-numbered) frozen problem
+                    }
+                }
+            }
+
+            if (!has_frozen_problems) break;
+
+            // Unfreeze this problem (reset frozen submissions)
+            lowest_frozen_team->problems[lowest_frozen_problem].frozen_submissions = 0;
+
+            // Recalculate rankings
+            vector<Team*> after_teams = team_ptrs;
+            sort(after_teams.begin(), after_teams.end(), [this](Team* a, Team* b) {
+                return compare_teams(a, b);
+            });
+
+            // Check if this unfreezing caused any ranking changes
+            bool ranking_changed = false;
+            for (size_t i = 0; i < before_teams.size(); i++) {
+                if (before_teams[i] != after_teams[i]) {
+                    // A ranking change occurred
+                    Team* moved_up_team = after_teams[i];
+                    Team* displaced_team = before_teams[i];
+                    cout << moved_up_team->name << " " << displaced_team->name << " " << moved_up_team->solved_count << " " << moved_up_team->total_penalty << endl;
+                    ranking_changed = true;
+                    break; // Only show the first change per unfreezing operation
+                }
+            }
+
+            if (ranking_changed) {
+                // Update before_teams for next iteration
+                before_teams = after_teams;
+            }
+        }
+
         frozen = false;
-
-        for (auto& team_pair : teams) {
-            for (const auto& problem_name : problem_names) {
-                team_pair.second.freeze_problem(problem_name);
-            }
-        }
-
-        vector<Team*> after_teams = team_ptrs;
-        sort(after_teams.begin(), after_teams.end(), [this](Team* a, Team* b) {
-            return compare_teams(a, b);
-        });
-
-        for (size_t i = 0; i < before_teams.size(); i++) {
-            if (before_teams[i] != after_teams[i]) {
-                cout << before_teams[i]->name << " " << after_teams[i]->name << " " << before_teams[i]->solved_count << " " << before_teams[i]->total_penalty << endl;
-            }
-        }
-
-        print_scoreboard(after_teams);
+        print_scoreboard(before_teams);
     }
 
     void query_ranking(const string& team_name) {
@@ -255,6 +299,12 @@ public:
 
 private:
     bool compare_teams(Team* a, Team* b) {
+        // Before first flush, rank by lexicographic order of team names
+        if (!first_flush_done) {
+            return a->name < b->name;
+        }
+
+        // After first flush, use the full ranking logic
         if (a->solved_count != b->solved_count) {
             return a->solved_count > b->solved_count;
         }
